@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Multiplayer Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+        const socket = io();
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const light = new THREE.AmbientLight(0xffffff);
+        scene.add(light);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(500, 500);
+        const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // Players
+        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff });
+        const players = {};
+
+        function createPlayer(id, x = 0, y = 1, z = 0) {
+            const geometry = new THREE.BoxGeometry(1, 2, 1);
+            const player = new THREE.Mesh(geometry, playerMaterial);
+            player.position.set(x, y, z);
+            scene.add(player);
+            players[id] = player;
+        }
+
+        socket.on('currentPlayers', (serverPlayers) => {
+            Object.entries(serverPlayers).forEach(([id, pos]) => {
+                if (!players[id]) createPlayer(id, pos.x, pos.y, pos.z);
+            });
+        });
+
+        socket.on('newPlayer', (data) => createPlayer(data.id, data.x, data.y, data.z));
+
+        socket.on('playerMoved', (data) => {
+            const player = players[data.id];
+            if (player) {
+                player.position.set(data.x, data.y, data.z);
+                player.rotation.y =
